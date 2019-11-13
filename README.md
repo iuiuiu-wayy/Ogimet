@@ -7,8 +7,9 @@ Usage:
 >>>>> pip3 install requirements.txt
 
 3. Download your data :
->>>> python ogimet.py (end-year) (end-month) (start-year) (start-month) (stationid)")
->>>> python ogimet.py 2019 5 2019 1 97240")
+python ogimet.py (end-year) (end-month) (start-year) (start-month) (stationid)")
+
+python ogimet.py 2019 5 2019 1 97240")
 
 
 If you find any error, feel free to contact me
