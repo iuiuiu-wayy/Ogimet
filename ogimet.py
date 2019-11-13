@@ -158,3 +158,4 @@ if __name__ == '__main__':
         D = Downloader()
         #D.running_all(2019, 5, start_year=2019, start_month=1, stationid="97240")
         D.running_all(int(yend), int(mend), int(ystart), int(mstart), stationid)
+        print("Enjoy you data :) ")
