@@ -1,5 +1,5 @@
 lxml>=4.4
-numpy==1.16
+numpy
 requests==2.22
 csvkit==1.0
 python-dateutil==2.8
