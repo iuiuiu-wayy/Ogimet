@@ -16,18 +16,16 @@ class Downloader():
         else:
             self.sep = "/"
 
+        self.temptcolnames = ['Max', 'Min', 'Avg']
+        self.windcolnames = ['Dir.', 'Int.']
+        self.sumcolnames = ['03', '06', '09', '12', '15', '18', '21', '24']
         self.comb = {}
-
-        try:
-            os.mkdir('weather')
-        except:
-            pass
-
 
     def month_iter(self, start_month, start_year, end_month, end_year):
         start = datetime(start_year, start_month, 1)
         end = datetime(end_year, end_month, 1)
-        return ((d.month, d.year) for d in rrule(MONTHLY, dtstart=start, until=end))
+        r = ((d.month, d.year) for d in rrule(MONTHLY,dtstart=start, until=end))
+        return r
 
     def tryGetTable(self, tree, year, month, attempt=10):
         if attempt == 0:
@@ -42,14 +40,24 @@ class Downloader():
         if attempt == 0:
             return "Fail"
         page = requests.get(link)
-        if any( [page.status_code != 200, not page.content.__str__().__contains__('summary')]):
+        noSummary=page.content.__str__().__contains__('summary')
+        if any( [page.status_code != 200, not noSummary ]):
             requestData(link, attempt=attempt-1)
         tree = html.fromstring(page.content)
         return tree
 
-    def running_all(self, end_year, end_month, start_year=2000, start_month=1, stationid="97240", location=os.getcwd()):
+    def running_all(self, end_year, end_month, start_year=2000, start_month=1,\
+    stationid="97240", location=os.getcwd()):
         self.stationid = stationid
-        self.location = location + self.sep + "weather"
+        #make directory
+        dir_name = stationid + "-" + str(start_year) + str(start_month) + "-"+\
+         str(end_year)+ str(end_month)
+        try:
+            os.mkdir(location + self.sep + dir_name )
+        except FileExistsError:
+            print("direcory already exist")
+        self.location = location + self.sep + dir_name
+
         for m in self.month_iter(start_month, start_year, end_month, end_year):
             print("running " + m[1].__str__() + "-" + m[0].__str__() )
             #print(m[0])
@@ -57,14 +65,18 @@ class Downloader():
             self.completeRun(m[1], m[0])
 
     def linkConstructor(self, year, month):
-        link = "https://www.ogimet.com/cgi-bin/gsynres?lang=en&ind="+ self.stationid +"&ndays=" + monthrange(year, month)[1].__str__() + "&ano=" + year.__str__() + "&mes=" + "%02d" % month + "&day=" + "%02d" % monthrange(year, month)[1] + "&hora=00&ord=REV&Send=Send"
+        link = "https://www.ogimet.com/cgi-bin/gsynres?lang=en&ind="+ \
+        self.stationid +"&ndays=" + monthrange(year, month)[1].__str__() + \
+        "&ano=" + year.__str__() + "&mes=" + "%02d" % month + "&day=" + \
+        "%02d" % monthrange(year, month)[1] + "&hora=00&ord=REV&Send=Send"
         return link
 
     def requestData(self,link, attempt=10):
         if attempt == 0:
             return "Fail"
         page = requests.get(link)
-        if any( [page.status_code != 200, not page.content.__str__().__contains__('summary')]):
+        noSummary= page.content.__str__().__contains__('summary')
+        if any( [page.status_code != 200, not noSummary ]):
             requestData(link, attempt=attempt-1)
         tree = html.fromstring(page.content)
         return tree
@@ -79,6 +91,31 @@ class Downloader():
         with open('report.log', 'a') as report:
             report.write(year.__str__() + "-" + month.__str__() + "\n")
 
+    def getcolum(self, table):
+        colnames = []
+        for a in table.getchildren()[1][0][:]:
+            if a.text_content().__contains__("Temperature"):
+                for b in table.getchildren()[1][1]:
+                    if self.temptcolnames.__contains__(b.text_content()):
+                        col = a.text_content() + b.text_content()
+                        colnames.append(col)
+            elif a.text_content().__contains__("Wind"):
+                for b in table.getchildren()[1][1]:
+                    if self.windcolnames.__contains__(b.text_content()):
+                        col = a.text_content() + b.text_content()
+                        colnames.append(col)
+            elif a.text_content().__contains__("summary"):
+                for c in self.sumcolnames:
+                    col = a.text_content() + c
+                    colnames.append(col)
+            else:
+                col = a.text_content()
+                colnames.append(col)
+
+        #print("colnames")
+        #print(colnames)
+        return colnames
+
     def writeData(self,tree, year, month, location, basename=''):
 
         if tree == "Fail":
@@ -88,74 +125,85 @@ class Downloader():
         if table == "Fail":
             self.failDetector(year, month)
             return 0
+
+        colnames = self.getcolum(table)
+
         caption = table.getchildren()[0]
         tr = table.getchildren()[2:monthrange(year, month)[1] + 2]
+        monthly = 0
+        na = 0
         for a in tr[::-1]:
             data = {}
-            data['date'] = a.getchildren()[0].text_content() # bulan/tanggal
-            data['maxtmp'] = a.getchildren()[1].text_content() # max temp
-            data['mintmp'] = a.getchildren()[2].text_content() # min temp
-            data['avgtmp'] = a.getchildren()[3].text_content() # avg temp
-            data['tdavg'] = a.getchildren()[4].text_content() # Td avg
-            data['Hravg'] = a.getchildren()[5].text_content() # Hr. avg
-            data['wnddir'] = a.getchildren()[6].text_content() # wind direction
-            data['wndspd'] = a.getchildren()[7].text_content() # wind speed
-            data['sfcprs'] = a.getchildren()[8].text_content() # surface pressure
-            data['prec'] = a.getchildren()[9].text_content() # prec
-            data['TotClOct'] = a.getchildren()[10].text_content() # Tot Cl Oct
-            data['LowClOct'] = a.getchildren()[11].text_content() # low Cl Oct
-            data['SunDuration'] = a.getchildren()[12].text_content() # sun duration in hr
-            data['visibility'] = a.getchildren()[13].text_content() # visibility in km
-            try:
-                data['weather3'] = a.getchildren()[14].getchildren()[0].attrib # weather 03 utc
-                data['weather6'] = a.getchildren()[15].getchildren()[0].attrib # 06
-                data['weather9'] = a.getchildren()[16].getchildren()[0].attrib # 09
-                data['weather12'] = a.getchildren()[17].getchildren()[0].attrib # 12
-                data['weather15'] = a.getchildren()[18].getchildren()[0].attrib # 15
-                data['weather18'] = a.getchildren()[19].getchildren()[0].attrib # 18
-                data['weather21'] = a.getchildren()[20].getchildren()[0].attrib # 21
-                data['weather24'] = a.getchildren()[21].getchildren()[0].attrib # 00
-            except:
-                data['weather3'] = 'No Data'
-                data['weather6'] = 'No Data'
-                data['weather9'] = 'No Data'
-                data['weather12'] = 'No Data'
-                data['weather15'] = 'No Data'
-                data['weather18'] = 'No Data'
-                data['weather21'] = 'No Data'
-                data['weather24'] = 'No Data'
+            id = 0
+            for colname in colnames:
+                try:
+                    data[colname] = a.getchildren()[id].text_content()
+                except:
+                    data[colname] = 'No Data'
+                id = id + 1
 
-
-            #print(data)
-            #np.save(location + 'data' + data['date'].split("/")[0] + '-' + data['date'].split("/")[1] + '.npy', data)
-            name = self.sep + basename + 'data' + year.__str__() + '-' + "%02d" % month + '-' + data['date'].split("/")[1] + '.csv'
+            name = self.sep + basename + 'data' + year.__str__() + '-' +\
+            "%02d" % month + '-' + data['Date'].split("/")[1] + '.csv'
             self.comb[name]=data
 
+
             for key, value in data.items():
-                timestamp = year.__str__() + "-%02d-" % month + data['date'].split("/")[1]
+                timestamp = year.__str__() + "-%02d-" % month + \
+                data['Date'].split("/")[1]
                 self.writecsv(key, timestamp , value)
+
+                #### additional for botir requests
+                if key.__contains__("Prec"):
+                    if value == 'Tr':
+                        value = 0
+
+                    if any ( [value == '----' , value == 'No data']):
+                        value = 'NA'
+                        na = na + 1
+                    else:
+                        monthly = monthly + float(value)
+
+        #### write monthly data
+        filename = self.location + self.sep + "monthly-prec" + ".csv"
+        filename2 = self.location + self.sep + "monthly-prec-na" + ".csv"
+        time = year.__str__() + "-%02d" % month
+        with open(filename, 'a') as csv_file:
+            csv_file.write("%s, %s\n" % (time, str(monthly)))
+
+        with open(filename2, 'a') as csv_file2:
+            csv_file2.write("%s, %s\n" % (time, str(na)))
 
     def writecsv(self, key, timestamp, val):
         #self.comb[filename] = dict
-        filename = self.location + self.sep + key + ".csv"
+        if not key.endswith("."):
+            filename = self.location + self.sep + key + ".csv"
+        elif key.__contains__("/"):
+            newkey = key.split("/")[0] + key.split("/")[1]
+            filename = self.location + self.sep + newkey + "csv"
+        else:
+            filename = self.location + self.sep + key + "csv"
+
+
         with open(filename, 'a') as csv_file:
             if any ( [val == '----' , val == 'No data']):
                 val = 'NA'
             if val == 'Tr':
                 val = 0
-            csv_file.write("%s,%s\n" % (timestamp, val))
+            csv_file.write("%s, %s\n" % (timestamp, val))
 
 if __name__ == '__main__':
     cont = True
     try:
         script, yend, mend, ystart, mstart, stationid = argv
     except:
-        print("usage >>>> python ogimet.py (end-year) (end-month) (start-year) (start-month) (stationid)")
+        format = '(end-year) (end-month) (start-year) (start-month) (stationid)'
+        print("usage >>>> python ogimet.py " + format)
         print("example >>>>> python ogimet.py 2019 5 2019 1 97240")
         print(" WARNING!!!!: DO NOT OPEN THE FILE WHILE DOWNLOADED!!!!")
         cont = False
     if cont:
         D = Downloader()
-        #D.running_all(2019, 5, start_year=2019, start_month=1, stationid="97240")
+        #D.running_all(2019, 5, start_year=2019, start_month=1,\
+        #stationid="97240"
         D.running_all(int(yend), int(mend), int(ystart), int(mstart), stationid)
         print("Enjoy you data :) ")
