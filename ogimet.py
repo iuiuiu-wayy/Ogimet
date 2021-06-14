@@ -77,7 +77,7 @@ class Downloader():
         page = requests.get(link)
         noSummary= page.content.__str__().__contains__('summary')
         if any( [page.status_code != 200, not noSummary ]):
-            requestData(link, attempt=attempt-1)
+            self.requestData(link, attempt=attempt-1)
         tree = html.fromstring(page.content)
         return tree
 
