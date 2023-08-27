@@ -1,8 +1,7 @@
-import requests, csv
-import numpy as np
+import requests
 from lxml import html
 from calendar import monthrange
-from dateutil.rrule import rrule, MONTHLY, DAILY
+from dateutil.rrule import rrule, MONTHLY
 from datetime import datetime
 import os
 from sys import argv
