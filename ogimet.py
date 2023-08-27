@@ -60,8 +60,6 @@ class Downloader():
 
         for m in self.month_iter(start_month, start_year, end_month, end_year):
             print("running " + m[1].__str__() + "-" + m[0].__str__() )
-            #print(m[0])
-            #print(m[1])
             self.completeRun(m[1], m[0])
 
     def linkConstructor(self, year, month):
@@ -112,8 +110,6 @@ class Downloader():
                 col = a.text_content()
                 colnames.append(col)
 
-        #print("colnames")
-        #print(colnames)
         return colnames
 
     def writeData(self,tree, year, month, location, basename=''):
@@ -174,7 +170,6 @@ class Downloader():
             csv_file2.write("%s, %s\n" % (time, str(na)))
 
     def writecsv(self, key, timestamp, val):
-        #self.comb[filename] = dict
         if not key.endswith("."):
             filename = self.location + self.sep + key + ".csv"
         elif key.__contains__("/"):
